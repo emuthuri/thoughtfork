@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>thoughtFork</title>
+  <meta name="application-name" content="thoughtFork">
+  <meta name="description" content="Follow what became of an idea.">
+  <meta name="theme-color" id="appThemeColor" content="#f4f3f0">
+  <link rel="icon" href="/icons/thoughtfork.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/icons/thoughtfork.ico" sizes="16x16 32x32 48x48 64x64 256x256">
+  <link rel="apple-touch-icon" href="/icons/thoughtfork-180.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <script src="/appearance.js"></script>
+  <link rel="stylesheet" href="/themes.css">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/thread.css">
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <button id="sidebarBackdrop" type="button" class="sidebar-backdrop hidden" aria-label="Close navigation"></button>
+  <div id="app" class="app-shell">
+    <aside id="navigationSidebar" class="sidebar">
+      <button id="sidebarToggle" type="button" class="button sidebar-toggle" aria-controls="navigationSidebar" aria-expanded="true" aria-label="Collapse navigation">‹</button>
+      <div class="brand-row">
+        <div class="mark" aria-hidden="true"><img src="/icons/thoughtfork.svg" width="34" height="34" alt=""></div>
+        <div class="brand-text"><div class="brand">thoughtFork</div><div class="subbrand">Follow what became of an idea.</div></div>
+      </div>
+
+      <nav class="nav" aria-label="Main navigation">
+        <button disabled class="nav-item active" data-view="review" aria-label="Review" title="Review"><span class="nav-icon" aria-hidden="true">◉</span><span class="nav-label">Review</span><kbd>R</kbd></button>
+        <button disabled class="nav-item" data-view="browse" aria-label="Browse" title="Browse"><span class="nav-icon" aria-hidden="true">▤</span><span class="nav-label">Browse</span><kbd>B</kbd></button>
+        <button disabled class="nav-item" data-view="sources" aria-label="Raw sources" title="Raw sources"><span class="nav-icon" aria-hidden="true">▧</span><span class="nav-label">Raw sources</span></button>
+        <button disabled class="nav-item" data-view="compile" aria-label="Compilation" title="Compilation"><span class="nav-icon" aria-hidden="true">≡</span><span class="nav-label">Compilation</span></button>
+      </nav>
+      <button id="railFilters" type="button" class="button rail-filters" aria-label="Open filters and project management" title="Filters and projects"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16l-6.5 7v6l-3 1v-7z"/></svg></button>
+
+      <div class="side-section">
+        <h2 class="side-title"><button type="button" data-section="project" aria-controls="projectFilters" aria-expanded="true">Projects<span aria-hidden="true">⌄</span></button></h2>
+        <div id="projectFilters" class="side-options"></div>
+        <button id="manageProjects" type="button" class="text-button manage-projects">Manage projects…</button>
+      </div>
+      <div class="side-section">
+        <h2 class="side-title"><button type="button" data-section="disposition" aria-controls="dispositionFilters" aria-expanded="true">Disposition<span aria-hidden="true">⌄</span></button></h2>
+        <div id="dispositionFilters" class="side-options"></div>
+      </div>
+      <div class="side-section">
+        <h2 class="side-title"><button type="button" data-section="action" aria-controls="actionFilters" aria-expanded="true">Action<span aria-hidden="true">⌄</span></button></h2>
+        <div id="actionFilters" class="side-options"></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button id="exportJsonBtn" class="text-button">Export ledger JSON</button>
+        <button id="importJsonBtn" class="text-button">Import ledger JSON</button>
+        <input id="importJsonInput" type="file" accept="application/json,.json" hidden>
+        <label class="shortcut-setting"><input id="shortcutsEnabled" type="checkbox" checked> Enable single-key shortcuts</label>
+        <div class="tiny">Canonical data: <code>data/ledger.json</code></div>
+      </div>
+    </aside>
+
+    <main id="mainContent" class="main" tabindex="-1">
+      <header class="topbar">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input disabled id="searchInput" type="search" aria-label="Search ideas and raw sources" aria-controls="searchResults" aria-expanded="false" placeholder="Search ideas, tags, comments, sources…" autocomplete="off">
+          <kbd>/</kbd>
+          <div id="searchResults" class="search-results hidden" role="region" aria-label="Search suggestions"></div>
+        </div>
+        <button disabled id="captureBtn" class="button accent">+ Quick capture</button>
+        <button disabled id="snapshotBtn" class="button">Snapshot</button>
+        <label class="appearance-control"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg><span class="sr-only">Appearance</span><select id="appearanceSelect" aria-label="Appearance" aria-describedby="appearanceStatus"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label><span id="appearanceStatus" class="sr-only" role="status"></span>
+      </header>
+
+      <p id="appearanceNotice" class="appearance-notice" role="status" hidden></p>
+      <div id="saveBar" class="save-bar"><span id="saveState" role="status" aria-live="polite">Loading…</span><button id="reviewDrafts" class="link-button hidden">Review drafts</button><span id="backupWarning" role="status"></span></div>
+      <div id="statusLine" class="status-line"></div>
+      <div id="navigationContext" class="navigation-context"></div><p id="navigationNotice" class="navigation-notice" role="status"></p>
+
+      <section id="reviewView" class="view"></section>
+      <section id="browseView" class="view hidden"></section>
+      <section id="sourcesView" class="view hidden"></section>
+      <section id="searchView" class="view hidden" aria-label="Complete search results"></section>
+      <section id="threadView" class="view hidden" aria-label="Idea thread"></section>
+      <section id="compileView" class="view hidden"></section>
+    </main>
+  </div>
+
+  <dialog id="projectsDialog" class="modal projects-modal" aria-labelledby="projectsTitle">
+    <div class="persistence-dialog"><div class="modal-head"><div><h2 id="projectsTitle">Manage projects</h2><p>Create and order your projects here. Pins appear first. Pins and hiding empty projects stay in this browser; names and order travel with the ledger.</p></div><button id="projectsClose" type="button" class="icon-button" aria-label="Close project management">×</button></div>
+    <form id="projectCreateForm"><label>New project <input id="projectCreateName" required maxlength="200" autocomplete="off"></label><button id="projectCreateCommit" class="button" type="submit">Create project</button></form>
+    <ul id="projectList" class="project-list"></ul>
+    <form id="projectRenameForm"><h3>Rename project</h3><label>Current project <select id="projectRenameFrom"></select></label><label>New name <input id="projectRenameTo" required maxlength="200" autocomplete="off"></label><p id="projectRenameSummary"></p><label id="projectCombineRow" class="checkbox-row hidden"><input id="projectCombine" type="checkbox"> I understand this combines these existing project categories.</label><p id="projectError" class="save-error" role="status"></p><div class="modal-actions"><button id="projectRefresh" type="button" class="button">Review latest projects</button><button id="projectRenameCommit" type="submit" class="button accent">Rename project</button></div></form></div>
+  </dialog>
+  <dialog id="captureDialog" class="modal">
+    <form id="captureForm">
+      <div class="modal-head"><div><h2>Quick capture</h2><p>Preserves the raw text and creates one reviewable item.</p></div><button id="captureClose" type="button" class="icon-button" aria-label="Close">×</button></div>
+      <label>Title <input name="title" placeholder="Optional — first line is used if blank"></label>
+      <div class="two-col"><label>Project <input name="project" value="Inbox"></label><label>Type <input name="type" value="Capture"></label></div>
+      <label>Tags <input name="tags" placeholder="comma, separated, tags"></label>
+      <label>Note <textarea name="raw" rows="12" placeholder="Write or paste the thought exactly as you want it preserved…"></textarea></label>
+      <p id="captureError" class="save-error" role="alert"></p><button id="captureReviewCurrent" type="button" class="link-button hidden">Review the current ledger before retrying</button><div class="modal-actions"><button id="captureDiscard" type="button" class="button">Discard draft</button><button id="captureCancel" type="button" class="button">Cancel</button><button id="captureSave" type="button" class="button accent">Save capture</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="editDialog" class="modal">
+    <form id="editForm">
+      <input type="hidden" name="id">
+      <div class="modal-head"><div><h2>Edit idea</h2><p>The raw source remains untouched.</p></div><button id="editClose" type="button" class="icon-button" aria-label="Close">×</button></div>
+      <label>Title <input name="title" required></label>
+      <div class="two-col"><label>Project <input name="project"></label><label>Type <input name="type"></label></div>
+      <label>Tags <input name="tags"></label>
+      <label>Summary <textarea name="summary" rows="10"></textarea></label>
+      <p id="editError" class="save-error" role="alert"></p><button id="editReviewDraft" type="button" class="link-button">Compare / review retained draft</button><div class="modal-actions"><button id="editDiscard" type="button" class="button">Discard draft</button><button id="editCancel" type="button" class="button">Cancel</button><button id="editSave" type="button" class="button accent">Save changes</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="sourceDialog" class="modal source-modal" aria-labelledby="sourceDialogTitle">
+    <div class="source-modal-shell">
+      <div class="modal-head source-modal-head">
+        <div><h2 id="sourceDialogTitle">Raw source</h2><p id="sourceDialogMeta"></p></div>
+        <button id="sourceClose" type="button" class="icon-button" aria-label="Close">×</button>
+      </div>
+      <div class="source-toolbar">
+        <button id="sourceSmaller" aria-label="Decrease source font size" type="button" class="button compact">A−</button>
+        <button id="sourceLarger" aria-label="Increase source font size" type="button" class="button compact">A+</button>
+        <button id="sourceCreate" type="button" class="button compact accent">Create idea from this source</button>
+        <button id="sourceCopy" type="button" class="button compact">Copy source</button>
+        <button id="sourceLibrary" type="button" class="button compact">Open in Raw sources</button>
+      </div>
+      <div id="sourceDialogRaw" class="full-source-text" tabindex="0" aria-label="Verbatim raw source"></div>
+      <div class="section-label">EXTRACTED IDEAS</div>
+      <label class="source-idea-search">Find a contribution <input id="sourceIdeaSearch" type="search" autocomplete="off"></label><div id="sourceIdeasPaging"></div>
+      <div id="sourceDialogIdeas" class="source-idea-links"></div>
+    </div>
+  </dialog>
+
+  <dialog id="derivedDialog" class="modal evolution-modal" aria-labelledby="derivedTitle"><form id="derivedForm">
+    <h2 id="derivedTitle">Create idea from this source</h2><p id="derivedSourceTitle"></p><p>The raw source stays unchanged. Save each distinct idea separately.</p>
+    <label>Title <input name="title" required></label><div class="two-col"><label>Project <input name="project" required></label><label>Type <input name="type" required></label></div><label>Tags <input name="tags" placeholder="comma, separated"></label><label>Summary <textarea name="summary" rows="7" required></textarea></label><label>Optional source excerpt <textarea name="excerpt" rows="3" placeholder="Select a passage in Full Source before creating, or paste an exact passage here. Leave blank to reference the whole source."></textarea></label><p id="derivedError" class="save-error" role="alert"></p><button id="derivedReviewSource" type="button" class="link-button">Review latest source before retrying</button><details id="derivedLatest" class="hidden"><summary>Latest source</summary><pre id="derivedLatestText" class="persistence-text" tabindex="0"></pre><button id="derivedUseSource" type="button" class="button">Use this reviewed source</button></details><div class="modal-actions"><button id="derivedDiscard" type="button" class="button">Discard draft</button><button id="derivedCancel" type="button" class="button">Cancel</button><button id="derivedAnother" type="button" class="button">Save and create another</button><button id="derivedSave" type="button" class="button accent">Save idea</button></div>
+  </form></dialog>
+  <dialog id="originDialog" class="modal" aria-labelledby="originTitle"><form id="originForm"><h2 id="originTitle">Add contributing source</h2><p id="originIdeaTitle"></p><p>Existing origins remain recorded. This adds evidence; it does not edit the source.</p><label>Find a source <input id="originSearch" type="search" placeholder="Search source title or project"></label><label>Source <select id="originSource" class="select"></select></label><label>Optional exact excerpt <textarea id="originExcerpt" rows="4"></textarea></label><p id="originError" class="save-error" role="alert"></p><button id="originReviewLatest" type="button" class="link-button">Review latest idea before retrying</button><details id="originLatest" class="hidden"><summary>Latest idea</summary><pre id="originLatestText" class="persistence-text" tabindex="0"></pre><button id="originUseLatest" type="button" class="button">Use this reviewed idea version</button></details><div class="modal-actions"><button id="originDiscard" type="button" class="button">Discard draft</button><button id="originCancel" type="button" class="button">Cancel</button><button id="originSave" type="button" class="button accent">Add source</button></div></form></dialog>
+  <dialog id="mergeDialog" class="modal merge-modal" aria-labelledby="mergeTitle"><form id="mergeForm"><h2 id="mergeTitle">Review and merge ideas</h2><p>Choose a surviving idea and write its final text yourself. Other selected ideas remain recoverable, with their comments, sources and connections. Compilation selections do not change.</p><label>Find ideas to merge <input id="mergeSearch" type="search" placeholder="Search titles, summaries, projects, types or tags"></label><div id="mergeCandidates" class="merge-candidates" aria-label="Merge candidates"></div><div id="mergeParticipants"></div><label>Surviving idea <select id="mergeSurvivor" class="select"></select></label><h3>Survivor after merge</h3><label>Title <input name="title" required></label><div class="two-col"><label>Project <input name="project" required></label><label>Type <input name="type" required></label></div><label>Tags <input name="tags"></label><label>Summary <textarea name="summary" rows="7" required></textarea></label><label>Survivor disposition <select name="disposition" id="mergeDisposition" class="select"></select></label><label class="checkbox-row"><input id="mergeConfirmed" type="checkbox"> I reviewed the selected ideas and confirm this merge. The other records will remain as superseded history; compilation selection stays unchanged.</label><p id="mergeError" class="save-error" role="alert"></p><div class="modal-actions"><button id="mergeDiscard" type="button" class="button">Discard draft</button><button id="mergeCancel" type="button" class="button">Cancel</button><button id="mergeRefresh" type="button" class="button">Review latest participants</button><button id="mergeCommit" type="button" class="button accent">Confirm merge</button></div></form></dialog>
+  <dialog id="replacementDialog" class="modal" aria-labelledby="replacementTitle">
+    <div class="persistence-dialog"><h2 id="replacementTitle">Review replacement</h2><pre id="replacementSummary" class="persistence-text"></pre><label id="emptyConfirmRow" class="checkbox-row hidden"><input id="confirmEmpty" type="checkbox"> I understand this replaces the entire ledger with an empty one.</label><p id="replacementError" class="save-error" role="alert"></p><div class="modal-actions"><button id="replacementCancel" class="button">Cancel</button><button id="replacementRefresh" class="button">Review again</button><button id="replacementCommit" class="button danger">Replace entire ledger</button></div></div>
+  </dialog>
+  <dialog id="draftDialog" class="modal" aria-labelledby="draftTitle">
+    <div class="persistence-dialog"><h2 id="draftTitle">Review retained draft</h2><p>Compare the latest saved values with your draft. Applying the draft explicitly replaces the fields shown below; another intervening edit will still cause a conflict.</p><pre id="draftComparison" class="persistence-text"></pre><p id="draftError" class="save-error" role="alert"></p><div class="modal-actions"><button id="draftClose" class="button">Keep draft / close</button><button id="draftDiscard" class="button">Discard draft</button><button id="draftApply" class="button accent">Apply draft to this version</button></div></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/idea-model.js"></script>
+  <script src="/retrieval.js"></script>
+  <script src="/search-ui.js"></script>
+  <script src="/thread-model.js"></script>
+  <script src="/thread-ui.js"></script>
+  <script src="/navigation.js"></script>
+  <script src="/save-client.js"></script>
+  <script src="/evolution.js"></script>
+  <script src="/desktop.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
+

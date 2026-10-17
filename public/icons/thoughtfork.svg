@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>thoughtFork</title>
+  <desc>One continuous thought opens into three possible paths.</desc>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#263445"/>
+  <path d="M72 190V158C72 138 88 126 110 126H128M128 126C148 126 164 110 164 90V66M128 126H188M128 126C148 126 164 142 164 162V190" fill="none" stroke="#B7D8FA" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

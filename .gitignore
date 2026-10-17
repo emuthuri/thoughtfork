@@ -1,0 +1,32 @@
+# All notebooks, backups, exports and recovery bytes are private.
+/data/*
+!/data/.gitkeep
+/data/backups/
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Personal notebooks stay local; never publish them with the application.
+/data/ledger.json
+/data/ledger-before-codex.json
+/data/*.tmp
+
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+*.bin
+*.zip
+*.bak
+*.tmp
+coverage/
+test-results/
+playwright-report/
+screenshots/
+exports/
+recovery/
+.local/
+.qa/
+.vscode/
+.idea/
