@@ -1,5 +1,7 @@
 # Windows application launch
 
+The usability update adds a shared native shortcut/window AppUserModelID. Rerun Setup and replace an old taskbar pin once; see [taskbar identity and platform checks](everyday-use.md#windows-taskbar-identity). The launcher now focuses only a window carrying this application's per-folder identity when launched through the installed shortcut.
+
 thoughtFork remains a local Node/browser application. No Electron, Tauri, tray daemon, runtime package dependency, second writer or new research-persistence path is introduced.
 
 ## Normal path

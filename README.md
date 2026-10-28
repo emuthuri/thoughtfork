@@ -162,4 +162,6 @@ Choose **View thread** from Review, Browse, search/preview, Sources & evolution 
 
 ## Contributing
 
+For source-note editing/history, capture stacks and shortcuts, close/reopen draft recovery, source sorting, Undo, Recent/pins, tags, internal links and batch organisation, see [Everyday use](docs/everyday-use.md). Source edits are versioned; existing extracted ideas and historical excerpts remain tied to their recorded source text.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and regression checks, [SECURITY.md](SECURITY.md) for private vulnerability reporting, and [LICENSE](LICENSE) for the MIT licence. Use synthetic notebooks in issues, tests and screenshots.

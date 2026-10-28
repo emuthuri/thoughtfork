@@ -43,7 +43,7 @@ try {
         } while ([DateTime]::UtcNow -lt $deadline)
         if (-not $health -or $health.application -ne 'thoughtFork' -or $health.projectId -ne $identity) { throw "thoughtFork did not become ready within 25 seconds. Check $stderr. The launcher did not terminate any process; resolve the startup problem before retrying." }
     }
-    $window = if ($NoBrowser) { 'none' } else { Open-ThoughtForkWindow -Url $url -BrowserMode $BrowserMode }
+    $window = if ($NoBrowser) { 'none' } else { Open-ThoughtForkWindow -Url $url -BrowserMode $BrowserMode -ProjectRoot $projectRoot }
     if ($PassThru) { [pscustomobject]@{ Started=$started; Url=$url; ServerPid=$health.pid; Window=$window; Mode=$health.mode; ProjectId=$identity } | ConvertTo-Json -Compress }
 } catch {
     if ($NoErrorDialog) { [Console]::Error.WriteLine($_.Exception.Message) } else { Show-ThoughtForkError $_.Exception.Message }

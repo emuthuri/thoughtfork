@@ -60,10 +60,11 @@ namespace ThoughtFork {
     return [ThoughtFork.NativeWindow]::SetForegroundWindow($handle)
 }
 
-function Open-ThoughtForkWindow([string]$Url, [string]$BrowserMode = 'Auto', [string]$EdgeExecutable = '') {
+function Open-ThoughtForkWindow([string]$Url, [string]$BrowserMode = 'Auto', [string]$EdgeExecutable = '', [string]$ProjectRoot = '') {
     if ($BrowserMode -eq 'Auto') {
-        if (Focus-ThoughtForkWindow) { return 'focused' }
+        if (-not $ProjectRoot -and (Focus-ThoughtForkWindow)) { return 'focused' }
         if (-not $EdgeExecutable) { $EdgeExecutable = Find-ThoughtForkEdge }
+        if ($EdgeExecutable -and $ProjectRoot) { return Open-ThoughtForkIdentifiedWindow -Url $Url -ProjectRoot $ProjectRoot -EdgeExecutable $EdgeExecutable }
         if ($EdgeExecutable) {
             try { Start-Process -FilePath $EdgeExecutable -ArgumentList @("--app=$Url") -ErrorAction Stop | Out-Null; return 'edge' }
             catch { } # A browser installation may be missing or restricted; use the registered browser.
@@ -76,4 +77,37 @@ function Open-ThoughtForkWindow([string]$Url, [string]$BrowserMode = 'Auto', [st
 function Show-ThoughtForkError([string]$Message) {
     try { Add-Type -AssemblyName System.Windows.Forms; [void][Windows.Forms.MessageBox]::Show($Message, 'thoughtFork could not open', 'OK', 'Error') }
     catch { Write-Error $Message }
+}
+
+function Initialize-ThoughtForkShellIdentity {
+    if (-not ('ThoughtFork.ShellIdentity' -as [type])) { Add-Type -Path (Join-Path $PSScriptRoot 'shell-identity.cs') }
+}
+function Get-ThoughtForkAppId([string]$ProjectRoot) { return 'org.thoughtFork.local.' + (Get-ThoughtForkIdentity $ProjectRoot).Substring(0,24) }
+function Set-ThoughtForkShortcutIdentity([string]$File, [string]$ProjectRoot) {
+    Initialize-ThoughtForkShellIdentity
+    [ThoughtFork.ShellIdentity]::SetShortcut($File, (Get-ThoughtForkAppId $ProjectRoot))
+}
+function Open-ThoughtForkIdentifiedWindow([string]$Url, [string]$ProjectRoot, [string]$EdgeExecutable, [string]$ProfileDirectory = '') {
+    Initialize-ThoughtForkShellIdentity
+    $appId = Get-ThoughtForkAppId $ProjectRoot
+    $before = @([ThoughtFork.ShellIdentity]::Windows())
+    foreach ($handle in $before) {
+        if ([ThoughtFork.ShellIdentity]::WindowId($handle) -eq $appId) { [void][ThoughtFork.ShellIdentity]::Focus($handle); return 'focused' }
+    }
+    $arguments = @("--app=$Url")
+    if ($ProfileDirectory) { $arguments += @('--user-data-dir="' + $ProfileDirectory + '"', '--no-first-run', '--no-default-browser-check') }
+    Start-Process -FilePath $EdgeExecutable -ArgumentList $arguments -ErrorAction Stop | Out-Null
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    do {
+        $new = @([ThoughtFork.ShellIdentity]::Windows() | Where-Object { $_ -notin $before })
+        if ($new.Count -eq 1) {
+            $command = '"' + (Join-Path $env:SystemRoot 'System32\wscript.exe') + '" //nologo "' + (Join-Path $ProjectRoot 'launch-thoughtfork.vbs') + '"'
+            $icon = (Join-Path $ProjectRoot 'public\icons\thoughtfork.ico') + ',0'
+            [ThoughtFork.ShellIdentity]::SetWindow($new[0], $appId, $command, $icon)
+            if ([ThoughtFork.ShellIdentity]::WindowId($new[0]) -ne $appId) { throw 'The thoughtFork window identity could not be verified.' }
+            return 'edge'
+        }
+        Start-Sleep -Milliseconds 150
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw 'Edge opened, but thoughtFork could not identify exactly one new app window for taskbar grouping. Close duplicate thoughtFork windows and relaunch. The notebook server remains safe.'
 }

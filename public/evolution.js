@@ -5,7 +5,7 @@ const EvolutionUI=(()=>{
   const model=()=>IdeaModel;
   const dispositionLabel=value=>value==='Merge'?'Needs merge':value;
   const ideaLink=(id,label)=>`<button type="button" class="link-button jump-idea" data-id="${attr(id)}">${esc(label||ideaById(id)?.title||'Missing idea')}</button>`;
-  function sourceReferences(idea){return model().origins(idea).map(p=>{const s=sourceById(p.sourceId);return `<li><button type="button" class="link-button open-origin" data-source="${attr(p.sourceId)}">${esc(s?.title||'Missing source')}</button><span class="tiny"> · ${esc(s?.project||'')} · ${p.sourceId===idea.source?'primary origin':'contributing origin'}${p.start!==undefined?' · excerpt':''}</span>${p.start!==undefined?`<blockquote class="origin-excerpt" tabindex="0">${esc(s?.raw.slice(p.start,p.end)||'')}</blockquote>`:''}</li>`;}).join('');}
+  function sourceReferences(idea){return model().origins(idea).map(p=>{const s=sourceById(p.sourceId);return `<li><button type="button" class="link-button open-origin" data-source="${attr(p.sourceId)}">${esc(s?.title||'Missing source')}</button><span class="tiny"> · ${esc(s?.project||'')} · ${p.sourceId===idea.source?'primary origin':'contributing origin'}${p.start!==undefined?' · excerpt':''} · source revision ${p.sourceRevision||0}</span>${p.start!==undefined?`<blockquote class="origin-excerpt" tabindex="0">${esc(IdeaModel.sourceRaw(p,s).slice(p.start,p.end)||'')}</blockquote>`:''}</li>`;}).join('');}
   function lineDescription(edge,incoming){
     const other=incoming?edge.from:edge.to;
     if(edge.relation==='merged-into')return incoming?`${ideaLink(other)} ${edge.completed?'was merged into this idea':'links into this idea (legacy merge link)'}`:`${edge.completed?'Merged into':'Legacy merge link to'} ${ideaLink(other)}`;
@@ -80,7 +80,7 @@ const EvolutionUI=(()=>{
     $('#derivedError').dataset.tone='error';
     const f=$('#derivedForm');if(!f.reportValidity())return;recordDerived('saving');const values=derivedValues(),source=sourceById(derivedContext.sourceId);
     if(!source){recordDerived('conflict','The original source is absent.');$('#derivedError').textContent='The original source is absent. Copy or discard your retained draft.';return;}
-    const body={...values,sourceId:source.id,generation:derivedContext.generation,...excerptFields(source,values.excerpt,derivedContext.selection)};delete body.excerpt;if(!('start'in body)&&values.excerpt)body.excerpt=values.excerpt;
+    const body={...values,sourceId:source.id,sourceRevision:source.revisions?.length||0,generation:derivedContext.generation,...excerptFields(source,values.excerpt,derivedContext.selection)};delete body.excerpt;if(!('start'in body)&&values.excerpt)body.excerpt=values.excerpt;
     let createdAnother=false;f.inert=true;$('#derivedError').textContent='';
     try{
       const out=await request('/api/ideas',{method:'POST',body:JSON.stringify(body)});saves.accept(out);saves.setForm('derived',null);

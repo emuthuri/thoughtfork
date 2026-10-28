@@ -11,7 +11,7 @@
     }
     connect(envelope) {
       this.ledger=envelope.ledger;this.versions=envelope.ideaVersions;this.version=envelope.version;
-      this.generation=envelope.generation;this.revision=envelope.revision;this.backup=envelope.backup;this.acceptedRevisions=Object.fromEntries(this.ledger.ideas.map(i=>[i.id,this.revision]));
+      this.sourceVersions=envelope.sourceVersions||{};this.generation=envelope.generation;this.revision=envelope.revision;this.backup=envelope.backup;this.acceptedSourceRevisions=Object.fromEntries(this.ledger.sources.map(s=>[s.id,this.revision]));this.acceptedRevisions=Object.fromEntries(this.ledger.ideas.map(i=>[i.id,this.revision]));
       const key=`research-ledger-drafts:${envelope.ledgerId}:${this.tab}`;
       if(this.key!==key){this.key=key;try { const saved=JSON.parse(this.storage.getItem(key)||'{}');this.drafts=Object.assign(Object.create(null),saved.drafts||{});this.forms=saved.forms||{};for(const f of Object.values(this.forms))if(f.status==='saving'){f.status='unsaved';f.error='The previous save was interrupted. Inspect confirmed state before retrying.';}for(const d of Object.values(this.drafts))if(d.status==='saving')d.status='unsaved'; }catch(_){this.storageWarning='Stored drafts could not be read. Keep this tab open and copy unsaved text before closing.';}}
       // A response can be lost during navigation even though its exact intent reached disk.
@@ -30,6 +30,8 @@
       this.notify();
     }
     setForm(name,value){if(value===null)delete this.forms[name];else this.forms[name]=copy(value);this.persist();}
+    recoverable(){const found=[];try{for(let n=0;n<(this.storage.length||0);n++){const k=this.storage.key(n);if(k!==this.key&&k?.startsWith(this.key.split(':').slice(0,2).join(':')+':')){const v=JSON.parse(this.storage.getItem(k)||'{}');if(Object.keys(v.drafts||{}).length||Object.keys(v.forms||{}).length)found.push({key:k,...v});}}}catch(_){this.storageWarning='Other-window drafts could not be read.';}return found;}
+    recover(key){if(this.dirty())return false;const item=this.recoverable().find(v=>v.key===key);if(!item)return false;this.drafts=copy(item.drafts||{});this.forms=copy(item.forms||{});for(const v of [...Object.values(this.drafts),...Object.values(this.forms)])if(v.status==='saving'){v.status='unsaved';v.error='Interrupted save. Inspect confirmed state before retrying.';}this.persist();try{const stored=JSON.parse(this.storage.getItem(this.key)||'{}');if(JSON.stringify(stored.drafts)===JSON.stringify(this.drafts)&&JSON.stringify(stored.forms)===JSON.stringify(this.forms)){const old=JSON.parse(this.storage.getItem(key)||'{}');if(JSON.stringify(old.drafts||{})===JSON.stringify(item.drafts||{})&&JSON.stringify(old.forms||{})===JSON.stringify(item.forms||{}))this.storage.setItem(key,JSON.stringify({drafts:{},forms:{}}));}}catch(_){this.storageWarning='Recovered drafts remain in both windows because storage could not be verified.';}return true;}
     dirty(){return Object.keys(this.drafts).length>0||Object.keys(this.forms).length>0;}
     status(){const statuses=[...Object.values(this.drafts),...Object.values(this.forms)].map(d=>d.status);return statuses.includes('conflict')?'Conflict':statuses.includes('failed')?'Save failed':this.runners.size||statuses.includes('saving')?'Saving…':this.dirty()?'Unsaved':'Saved';}
     draft(id){return this.drafts[id]||null;}
@@ -44,7 +46,7 @@
       return d;
     }
     accept(out){
-      const ideas=out.ideas||[out.idea];this.acceptedRevisions||={};
+      const ideas=out.ideas||(out.idea?[out.idea]:[]);this.acceptedRevisions||={};
       for(const idea of ideas){
         if(out.revision<(this.acceptedRevisions[idea.id]??-1))continue;
         const index=this.ledger.ideas.findIndex(i=>i.id===idea.id);
@@ -52,7 +54,7 @@
         this.versions[idea.id]=out.ideaVersions?.[idea.id]||(idea.id===out.idea?.id?out.ideaVersion:this.versions[idea.id]);
         this.acceptedRevisions[idea.id]=out.revision;
       }
-      if(out.source&&!this.ledger.sources.some(s=>s.id===out.source.id))this.ledger.sources.push(out.source);
+      {for(const source of out.sources||(out.source?[out.source]:[])){this.acceptedSourceRevisions||={};if(out.revision<(this.acceptedSourceRevisions[source.id]??-1))continue;this.acceptedSourceRevisions[source.id]=out.revision;const at=this.ledger.sources.findIndex(s=>s.id===source.id);if(at<0)this.ledger.sources.push(source);else this.ledger.sources[at]=source;this.sourceVersions||={};this.sourceVersions[source.id]=out.sourceVersions?.[source.id]||(source.id===out.source?.id?out.sourceVersion:this.sourceVersions[source.id]);}}
       if(out.revision>=this.revision){this.revision=out.revision;this.version=out.version;this.generation=out.generation;this.ledger.meta=out.meta;this.backup=out.backup;}
       this.onConfirmed(this);
     }
@@ -65,8 +67,10 @@
         while(this.drafts[id]){
           const current=this.drafts[id],snapshot=copy(current);current.status='saving';this.persist();
           try{
+            const previous=this.ledger.ideas.find(i=>i.id===id),before=previous?copy(previous):null;
             const out=await this.request(`/api/ideas/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({patch:snapshot.patch,baseVersion:snapshot.baseVersion})});
             this.accept(out);
+            if(before&&(!out.ideas||out.ideas.length===1))this.lastUndo={id,baseVersion:out.ideaVersion,patch:Object.fromEntries(Object.keys(snapshot.patch).map(k=>[k,copy(k in before.review?before.review[k]:before[k])]))};
             if(this.drafts[id]?.seq===snapshot.seq)delete this.drafts[id];
             else if(this.drafts[id]){this.drafts[id].baseVersion=out.ideaVersion;this.drafts[id].status='unsaved';}
             this.persist();
