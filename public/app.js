@@ -19,7 +19,7 @@ const state = {
   compileProject: 'All',
   saveTimers: new Map(),
   activeSourceId: null,
-  sourceFontSize: 14
+  sourceFontSize: 16
 };
 
 const $ = sel => document.querySelector(sel);
@@ -46,7 +46,7 @@ async function loadLedger(){
     $('#searchInput').disabled=false;
     $$('.nav-item').forEach(b=>b.disabled=false);$('#captureBtn').disabled=false;$('#snapshotBtn').disabled=false;
     $('#recoveryPanel')?.remove();
-    NavigationUI.loaded();
+    NavigationUI.loaded();UsabilityUI.loaded();
     if (!state.reviewId || !ideaById(state.reviewId)) state.reviewId = filteredIdeas()[0]?.id || state.ledger.ideas[0]?.id || null;
     ensureCurrentVisible();renderAll();updateSaveStatus();
   }catch(e){if(e.code==='RECOVERY_REQUIRED'){await showRecovery(e);return;}throw e;}
@@ -64,15 +64,15 @@ function ideaSources(i){return [...new Set(IdeaModel.origins(i).map(p=>p.sourceI
 function renderSearchResults(){SearchUI.suggestions();}
 function clearSearch(){state.search='';const input=$('#searchInput');if(input)input.value='';const box=$('#searchResults');if(box){box.classList.add('hidden');box.innerHTML='';}}
 function jumpToIdea(id,context={}){
-  if(!ideaById(id))return;NavigationUI.capture(context);if(document.querySelector('dialog[open]'))EvolutionUI.leaveForJump();state.reviewId=id;state.project=state.disposition=state.action='All';clearSearch();NavigationUI.resetPages();switchView('review');focusReviewStart();
+  if(!ideaById(id))return;NavigationUI.capture(context);if(document.querySelector('dialog[open]'))EvolutionUI.leaveForJump();state.reviewId=id;state.project=state.disposition=state.action='All';state.tagFilter='';clearSearch();NavigationUI.resetPages();switchView('review',true);focusReviewStart();
 }
 function filteredIdeas(){
   if(!state.ledger)return [];const items=state.search.trim()?SearchUI.getIndex().search(state.search).map(h=>h.item):state.ledger.ideas;
-  return Retrieval.sorted(Retrieval.filter(items,state),state.sort);
+  return Retrieval.sorted(Retrieval.filter(items,state).filter(UsabilityUI.ideaMatches),state.sort);
 }
 function filteredSources(){
   if(!state.ledger)return [];const items=state.search.trim()?SearchUI.getIndex().search(state.search,'sources').map(h=>h.item):state.ledger.sources,p=Retrieval.projectName(state.project);
-  return Retrieval.sorted(items.filter(s=>p===null||s.project===p),state.sort==='original'?'original':state.sort==='title'?'title':'created');
+  return Retrieval.sorted(items.filter(s=>p===null||s.project===p),state.sourceSort||'created');
 }
 
 function countsFor(field){
@@ -159,7 +159,7 @@ function renderReview(){
   $('#addLineageBtn').onclick=()=>addLineage(i.id);
   bindLineagePicker(i.id);
   $$('.remove-lineage').forEach(b=>b.onclick=()=>removeLineage(i.id,Number(b.dataset.index)));
-  EvolutionUI.bindReview(i);
+  EvolutionUI.bindReview(i);UsabilityUI.reviewActions(i);
 }
 function renderLineage(items){ return items.length?items.map((r,idx)=>`<div class="lineage-item"><span><strong>${esc(r.relation)}</strong> <button class="link-button jump-idea" data-id="${attr(r.targetId)}">${esc(r.targetId)}</button>${r.note?`<br>${esc(r.note)}`:''}</span><button class="remove-lineage" data-index="${idx}" title="Remove">×</button></div>`).join(''):'<div class="tiny">No idea relationships recorded yet.</div>'; }
 function lineageForm(){ return `<div class="lineage-add"><select id="relationSelect" aria-label="Relationship type">${RELATIONS.filter(r=>r!=='merged-into').map(r=>`<option>${esc(r)}</option>`).join('')}</select><div class="lineage-picker"><input id="relationTargetSearch" aria-label="Find a related idea" autocomplete="off" placeholder="Search title, keyword or ID…"><input id="relationTarget" type="hidden"><div id="lineageSuggestions" class="lineage-suggestions hidden"></div></div><input id="relationNote" aria-label="Relationship note" class="relation-note" placeholder="Optional note"><button id="addLineageBtn" class="button">Add relation</button></div>`; }
@@ -176,12 +176,12 @@ function dispositionDot(d){ const c=d==='Keep'?'keep':d==='Open question'?'open'
 function renderBrowse(){
   const all=filteredIdeas(),info=Retrieval.page(all,state.pages.browse,40);state.pages.browse=info.page;
   $('#browseView').innerHTML=`<div class="browse-toolbar"><div class="tiny">${all.length} matching ideas. Open a title to review; Back restores this list.</div><button id="browseUnreviewed" class="button">Go to next unreviewed</button></div><div class="table-wrap"><table class="idea-table"><thead><tr><th>Title / match</th><th>Project</th><th>Type</th><th>Disposition</th><th>Action</th><th>ID</th></tr></thead><tbody>${info.items.map(i=>{const r=review(i),hit=state.search.trim()?SearchUI.getIndex().search(state.search).find(h=>h.item.id===i.id):null;return `<tr class="clickable browse-row" data-id="${attr(i.id)}"><td class="title-cell"><button type="button" class="browse-open" data-id="${attr(i.id)}">${esc(i.title)}</button>${hit?SearchUI.evidence(hit):''}<button type="button" class="link-button thread-entry" data-thread="${attr(i.id)}">View thread</button></td><td>${esc(i.project)}</td><td>${esc(i.type)}</td><td>${dispositionDot(r.disposition)}${esc(i.merge?'Merged into '+(ideaById(i.merge.into)?.title||'missing idea'):EvolutionUI.dispositionLabel(r.disposition))}</td><td>${esc(r.action)}</td><td class="mono">${esc(i.id)}</td></tr>`;}).join('')}</tbody></table></div>${SearchUI.pager(info,'browsePager')}`;
-  $$('.browse-row').forEach(row=>row.onclick=()=>jumpToIdea(row.dataset.id));$('#browseUnreviewed').onclick=()=>{nextUnreviewed();switchView('review');};
+  $$('.browse-row').forEach(row=>row.onclick=e=>{if(e.target.closest('.bulk-select,.object-menu'))return;jumpToIdea(row.dataset.id);});$('#browseUnreviewed').onclick=()=>{nextUnreviewed();switchView('review');};
   SearchUI.bindPager('browsePager',info,n=>{state.pages.browse=n;renderBrowse();NavigationUI.remember();$('#browseView .browse-open')?.focus();});
 }
 function renderSources(){
   const info=Retrieval.page(filteredSources(),state.pages.sources,25);state.pages.sources=info.page;
-  $('#sourcesView').innerHTML=`<p class="results-explanation">Raw sources use the project and search filters. Disposition/action apply to ideas. Open Full Source for all contributions and reading controls.</p><div class="source-grid">${info.items.map(s=>{const refs=SearchUI.getIndex().contributions.get(s.id)||[],hit=state.search.trim()?SearchUI.getIndex().search(state.search,'sources').find(h=>h.item.id===s.id):null;return `<article class="source-card"><div class="eyebrow"><span class="pill project">${esc(s.project)}</span><span class="pill source">${esc(s.id)}</span><span class="pill">${refs.filter(i=>i.source===s.id).length} derived · ${refs.filter(i=>i.source!==s.id).length} additional contributions</span></div><h3>${esc(s.title)}</h3>${hit?SearchUI.evidence(hit):''}<div class="source-actions"><button type="button" class="button create-from-source" data-source="${attr(s.id)}">Create idea from this source</button><button type="button" class="link-button open-full-source" data-source="${attr(s.id)}">Open Full Source${refs.length>10?' · all '+refs.length+' contributions':''}</button></div><details class="inline-source" data-source="${attr(s.id)}"><summary>Show verbatim source</summary><div class="raw-text" tabindex="0"></div></details>${refs.length?`<div class="tags" style="margin-top:10px">${refs.slice(0,10).map(i=>`<button type="button" class="link-button jump-idea" data-id="${attr(i.id)}">${esc(i.title)} <span class="tiny">· ${i.source===s.id?'derived here':'contributing source'}</span></button>`).join('<span class="tiny"> · </span>')}</div>`:''}</article>`;}).join('')}</div>${SearchUI.pager(info,'sourcesPager')}`;
+  $('#sourcesView').innerHTML=`<p class="results-explanation">Raw sources use the project and search filters. Disposition/action apply to ideas. Open Full Source for all contributions and reading controls.</p><div class="source-grid">${info.items.map(s=>{const refs=SearchUI.getIndex().contributions.get(s.id)||[],hit=state.search.trim()?SearchUI.getIndex().search(state.search,'sources').find(h=>h.item.id===s.id):null;return `<article class="source-card"><div class="eyebrow"><span class="pill project">${esc(s.project)}</span><span class="pill source">${esc(s.id)}</span><span class="pill">${refs.filter(i=>i.source===s.id).length} derived · ${refs.filter(i=>i.source!==s.id).length} additional contributions</span></div><h3>${esc(s.title)}</h3>${hit?SearchUI.evidence(hit):''}<div class="source-actions"><button type="button" class="button create-from-source" data-source="${attr(s.id)}">Create idea from this source</button><button type="button" class="link-button open-full-source" data-source="${attr(s.id)}">Open Full Source${refs.length>10?' · all '+refs.length+' contributions':''}</button></div><details class="inline-source" data-source="${attr(s.id)}"><summary>Show current source text</summary><div class="raw-text" tabindex="0"></div></details>${refs.length?`<div class="tags" style="margin-top:10px">${refs.slice(0,10).map(i=>`<button type="button" class="link-button jump-idea" data-id="${attr(i.id)}">${esc(i.title)} <span class="tiny">· ${i.source===s.id?'derived here':'contributing source'}</span></button>`).join('<span class="tiny"> · </span>')}</div>`:''}</article>`;}).join('')}</div>${SearchUI.pager(info,'sourcesPager')}`;
   $$('.inline-source').forEach(d=>d.ontoggle=()=>{if(d.open)d.querySelector('.raw-text').textContent=sourceById(d.dataset.source).raw;});
   $$('.create-from-source').forEach(b=>b.onclick=()=>EvolutionUI.openDerived(b.dataset.source).catch(e=>toast(e.message,true)));$$('.open-full-source').forEach(b=>b.onclick=()=>openSourceModal(b.dataset.source));bindIdeaJumps();
   SearchUI.bindPager('sourcesPager',info,n=>{state.pages.sources=n;renderSources();NavigationUI.remember();const heading=$('#sourcesView h3');if(heading){heading.tabIndex=-1;heading.focus();}});
@@ -200,11 +200,11 @@ function renderSourceIdeas(){
 function openSourceModal(sourceId){
   const src=sourceById(sourceId);if(!src)return;const changed=state.activeSourceId!==sourceId;state.activeSourceId=sourceId;const refs=SearchUI.getIndex().contributions.get(sourceId)||[];
   $('#sourceDialogTitle').textContent=src.title;$('#sourceDialogMeta').textContent=`${src.id} · ${src.project} · ${refs.filter(i=>i.source===sourceId).length} derived ideas · ${refs.filter(i=>i.source!==sourceId).length} additional contributions`;
-  const raw=$('#sourceDialogRaw');if(changed||raw.textContent!==src.raw){raw.textContent=src.raw;raw.scrollTop=0;}raw.style.fontSize=`${state.sourceFontSize}px`;if(changed||!$('#sourceDialog').open){sourceIdeasPage=0;$('#sourceIdeaSearch').value='';}renderSourceIdeas();if(!$('#sourceDialog').open)$('#sourceDialog').showModal();
+  const raw=$('#sourceDialogRaw');if(changed||raw.textContent!==src.raw){raw.textContent=src.raw;raw.scrollTop=0;}raw.style.fontSize=`${state.sourceFontSize}px`;UsabilityUI.sourceOpened(src);if(changed||!$('#sourceDialog').open){sourceIdeasPage=0;$('#sourceIdeaSearch').value='';}renderSourceIdeas();if(!$('#sourceDialog').open)$('#sourceDialog').showModal();
 }
 
 function restoreSourceContext(reader){openSourceModal(reader.sourceId);$('#sourceIdeaSearch').value=reader.query||'';sourceIdeasPage=reader.page||0;renderSourceIdeas();$('#sourceDialogRaw').scrollTop=reader.scroll||0;[...$$('.source-idea-link')].find(b=>b.dataset.id===reader.ideaId)?.focus({preventScroll:true});}
-function adjustSourceFont(delta){state.sourceFontSize=Math.max(11,Math.min(22,state.sourceFontSize+delta));const el=$('#sourceDialogRaw');if(el)el.style.fontSize=`${state.sourceFontSize}px`;}
+function adjustSourceFont(delta){state.sourceFontSize=Math.max(11,Math.min(22,state.sourceFontSize+delta));const el=$('#sourceDialogRaw');if(el)el.style.fontSize=`${state.sourceFontSize}px`;UsabilityUI.rememberSize();}
 function openActiveSourceLibrary(){if(!state.activeSourceId)return;$('#sourceDialog').close();state.view='sources';state.project='All';state.search=state.activeSourceId;$('#searchInput').value=state.activeSourceId;renderAll();}
 
 function compilation(project=state.compileProject){return IdeaModel.markdown(state.ledger,Retrieval.projectName(project)??'All',undefined,project!=='All');}
@@ -220,9 +220,9 @@ function renderCompile(){
 function keptMarkdown(){ const old=state.ledger.ideas.map(i=>review(i).include); state.ledger.ideas.forEach(i=>review(i).include=review(i).disposition==='Keep'); const out=compilation('All'); state.ledger.ideas.forEach((i,n)=>review(i).include=old[n]); return out; }
 function slug(s){return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')||'research';}
 
-function renderAll(){if(!state.ledger)return;renderFilters();renderStats();renderViewVisibility();NavigationUI.toolbar();if(state.view==='review')renderReview();if(state.view==='browse')renderBrowse();if(state.view==='sources')renderSources();if(state.view==='compile')renderCompile();if(state.view==='search')SearchUI.renderComplete();if(state.view==='thread')ThreadUI.render();bindIdeaJumps();renderSearchResults();NavigationUI.remember();}
+function renderAll(){if(!state.ledger)return;renderFilters();renderStats();renderViewVisibility();NavigationUI.toolbar();if(state.view==='review')renderReview();if(state.view==='browse')renderBrowse();if(state.view==='sources')renderSources();if(state.view==='compile')renderCompile();if(state.view==='search')SearchUI.renderComplete();if(state.view==='thread')ThreadUI.render();bindIdeaJumps();renderSearchResults();NavigationUI.remember();UsabilityUI.decorate();}
 function renderViewVisibility(){const map={review:'#reviewView',browse:'#browseView',sources:'#sourcesView',compile:'#compileView',search:'#searchView',thread:'#threadView'};for(const[k,sel]of Object.entries(map))$(sel).classList.toggle('hidden',state.view!==k);$$('.nav-item').forEach(b=>{b.classList.toggle('active',b.dataset.view===state.view);if(b.dataset.view===state.view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});}
-function switchView(v){state.view=v;renderAll();}
+function switchView(v,inheritSort=false){state.viewSorts||={};state.viewSorts[state.view]=state.sort;state.view=v;state.sort=inheritSort?state.sort:state.viewSorts[v]||state.sort;renderAll();}
 
 async function patchIdea(id, patch, rerender=false){
   if(!ideaById(id))return false;
@@ -232,7 +232,7 @@ async function patchIdea(id, patch, rerender=false){
   return ok;
 }
 function debouncedPatch(id,patch,ms){saves.stage(id,patch,{delay:ms});}
-function editValues(){const f=$('#editForm');return {title:f.elements.title.value,project:f.elements.project.value,type:f.elements.type.value,tags:[...new Set(f.elements.tags.value.split(',').map(t=>t.trim().replace(/^#/, '')).filter(Boolean))],summary:f.elements.summary.value};}
+function editValues(){const f=$('#editForm');return {title:f.elements.title.value,project:f.elements.project.value,type:f.elements.type.value,tags:[...new Set(UsabilityUI.tags(f.elements.tags.value))],summary:f.elements.summary.value};}
 function recordEdit(){if(!editContext)return;const patch=editValues();saves.setForm('edit',JSON.stringify(patch)===JSON.stringify(editContext.initial)?null:{id:editContext.id,baseVersion:editContext.baseVersion,patch,initial:editContext.initial});}
 function openEdit(i){
   const saved=saves.forms.edit;
@@ -251,13 +251,12 @@ async function saveEdit(){
     saves.setForm('edit',null);$('#editDialog').close();ensureCurrentVisible();renderAll();toast('Idea saved.');
   }finally{f.inert=false;}
 }
-function captureValues(){const f=$('#captureForm');return {title:f.elements.title.value,project:f.elements.project.value,type:f.elements.type.value,tags:[...new Set(f.elements.tags.value.split(',').map(t=>t.trim().replace(/^#/, '')).filter(Boolean))],raw:f.elements.raw.value};}
-function recordCapture(){const value=captureValues();saves.setForm('capture',value.raw||value.title||value.tags.length||value.project!=='Inbox'||value.type!=='Capture'?{...value,generation:saves.forms.capture?.generation||saves.generation,status:'unsaved'}:null);}
+function captureValues(){return UsabilityUI.captureCards()[0];}
+function recordCapture(){const cards=UsabilityUI.captureCards(),value=cards[0];saves.setForm('capture',cards.some(c=>c.raw||c.title||c.tags.length||c.project!=='Inbox'||c.type!=='Capture')?{...value,cards,requestId:saves.forms.capture?.requestId||crypto.randomUUID(),generation:saves.forms.capture?.generation||saves.generation,status:'unsaved'}:null);}
 function openCapture(){
     $('#captureError').dataset.tone='error';
-  const f=$('#captureForm'),saved=saves.forms.capture;f.reset();const values=saved||{project:'Inbox',type:'Capture'};
-  for(const [k,v]of Object.entries(values))if(f.elements[k])f.elements[k].value=k==='tags'?v.join(', '):v;
-  $('#captureError').textContent=saved?.error||'';$('#captureReviewCurrent').classList.toggle('hidden',saved?.status!=='conflict');$('#captureDialog').showModal();setTimeout(()=>f.elements.raw.focus(),0);
+  const f=$('#captureForm'),saved=saves.forms.capture;UsabilityUI.fillCapture(saved);
+  $('#captureError').textContent=saved?.error||'';$('#captureReviewCurrent').classList.toggle('hidden',saved?.status!=='conflict');$('#captureDialog').showModal();setTimeout(()=>$('#captureCards textarea').focus(),0);
 }
 async function reviewCaptureGeneration(){
   try{
@@ -268,13 +267,13 @@ async function reviewCaptureGeneration(){
     $('#captureReviewCurrent').classList.add('hidden');$('#captureError').dataset.tone='info';$('#captureError').textContent='The current ledger has been reviewed. Retry Save to add your retained capture.';renderAll();
   }catch(e){$('#captureError').textContent=e.message;}
 }
-async function saveCapture(){
+async function saveCapture(continueCapture=false){
   $('#captureError').dataset.tone='error';
-  const f=$('#captureForm'),body=captureValues();if(!body.raw.trim()){toast('Write or paste a note first.',true);f.elements.raw.focus();return;}
-  recordCapture();body.generation=saves.forms.capture.generation;saves.setForm('capture',{...saves.forms.capture,status:'saving'});f.inert=true;$('#captureError').textContent='';
+  const f=$('#captureForm'),cards=UsabilityUI.captureCards(),valid=cards.filter(c=>c.raw.trim());if(!valid.length){toast('Write or paste a note first.',true);$('#captureCards textarea').focus();return;}if(valid.length!==cards.length&&!confirm('Skip '+(cards.length-valid.length)+' blank capture card(s) and save '+valid.length+' note(s)?'))return;
+  recordCapture();const body={cards:valid,requestId:saves.forms.capture.requestId,generation:saves.forms.capture.generation};saves.setForm('capture',{...saves.forms.capture,status:'saving'});f.inert=true;$('#captureError').textContent='';
   try{
     const out=await request('/api/captures',{method:'POST',body:JSON.stringify(body)});
-    saves.accept(out);saves.setForm('capture',null);$('#captureDialog').close();f.reset();state.reviewId=out.idea.id;state.project='All';state.disposition='All';state.action='All';switchView('review');toast('Capture saved.');
+    saves.accept(out);saves.setForm('capture',null);$('#captureDialog').close();f.reset();state.reviewId=out.idea.id;state.project='All';state.disposition='All';state.action='All';switchView('review');toast(valid.length+' note'+(valid.length===1?'':'s')+' saved to To review.');if(continueCapture)openCapture();
   }catch(e){saves.setForm('capture',{...saves.forms.capture,status:e.status===409?'conflict':'failed',error:e.message});$('#captureReviewCurrent').classList.toggle('hidden',e.status!==409);$('#captureError').textContent=e.message+' Your capture draft is retained. If the connection was lost, check the ledger before retrying; the outcome may be uncertain.';toast('Capture was not acknowledged. Draft retained.',true);}
   finally{f.inert=false;}
 }
@@ -309,7 +308,7 @@ function updateSaveStatus(){
   if(!saves)return;
   $('#saveState').textContent=state.ledger?saves.status():'Recovery mode';
   $('#saveState').dataset.state=saves.status();$('#reviewDrafts').classList.toggle('hidden',!saves.dirty());
-  $('#backupWarning').textContent=[saves.storageWarning,saves.backup?.warning].filter(Boolean).join(' ');
+  UsabilityUI.status();$('#backupWarning').textContent=[saves.storageWarning,saves.backup?.warning].filter(Boolean).join(' ');
 }
 async function reviewDrafts(){
   if($('#editDialog').open&&editContext&&saves.draft(editContext.id)){
@@ -322,7 +321,7 @@ async function reviewDrafts(){
   if(!entry){
     if(saves.forms.edit){const saved=saves.forms.edit;const i=ideaById(saved.id);if(i){if(!$('#editDialog').open)openEdit(i);return;}toast('This retained editor draft belongs to an idea no longer present. Export/copy its text before discarding.',true);}
     if(saves.forms.capture){if(!$('#captureDialog').open)openCapture();return;}
-    EvolutionUI.restoreDraft();return;
+    if(saves.forms.source){UsabilityUI.editSource(saves.forms.source.id);return;}EvolutionUI.restoreDraft();return;
   }
   const [id,draft]=entry;if(saves.runners.has(id)){toast('Wait for the pending save to finish.');return;}
   let latest;try{latest=await request('/api/ledger');}catch(e){toast(e.message,true);return;}
@@ -374,7 +373,7 @@ function handleKeys(e){
 function setup(){
   const browserStorage=name=>{try{return window[name];}catch(_){return {getItem:()=>{throw new Error('Storage unavailable');},setItem:()=>{throw new Error('Storage unavailable');}};}};
   saves=new SaveClient({request,storage:browserStorage('localStorage'),session:browserStorage('sessionStorage'),onChange:updateSaveStatus,onConfirmed:()=>{state.ledger=saves.ledger;SearchUI.invalidate();const moved=NavigationUI.reconcile();renderFilters();renderStats();updateSaveStatus();NavigationUI.remember();if(state.view==='thread')ThreadUI.render();if(moved){renderAll();focusReviewStart();}}});
-  SearchUI.setup();EvolutionUI.setup();NavigationUI.setup();ThreadUI.setup();
+  SearchUI.setup();EvolutionUI.setup();NavigationUI.setup();ThreadUI.setup();UsabilityUI.setup();
   $('#editForm').addEventListener('input',recordEdit);$('#captureForm').addEventListener('input',recordCapture);
   $('#editForm').addEventListener('submit',e=>{e.preventDefault();saveEdit();});$('#captureForm').addEventListener('submit',e=>{e.preventDefault();saveCapture();});
   $('#reviewDrafts').onclick=$('#editReviewDraft').onclick=reviewDrafts;$('#captureReviewCurrent').onclick=reviewCaptureGeneration;
@@ -385,8 +384,8 @@ function setup(){
   $('#editDiscard').onclick=()=>{if(confirm('Discard this unsaved editor draft?')){if(saves.discard(editContext.id)){saves.setForm('edit',null);$('#editDialog').close();}}};
   $('#captureDiscard').onclick=()=>{if(confirm('Discard this unsaved capture?')){saves.setForm('capture',null);$('#captureForm').reset();$('#captureDialog').close();}};
   for(const id of ['editDialog','captureDialog','replacementDialog','draftDialog'])$('#'+id).addEventListener('cancel',e=>{if(e.target.inert||e.target.querySelector('form')?.inert)e.preventDefault();});
-  window.addEventListener('beforeunload',e=>{if(saves.dirty()){saves.persist();e.preventDefault();e.returnValue='';}});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saves.persist();});
+  window.addEventListener('beforeunload',e=>{if(saves.dirty()){saves.persist();saves.flushAll().catch(()=>{});e.preventDefault();e.returnValue='';}});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){saves.persist();saves.flushAll().catch(()=>{});}});
   $$('.nav-item').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
   const search=$('#searchInput');
   search.addEventListener('input',e=>{state.search=e.target.value;NavigationUI.resetPages();ensureCurrentVisible();renderAll();});
@@ -408,5 +407,5 @@ function setup(){
 }
 
 setup();
-loadLedger().then(()=>{if(!state.ledger)return;saves.resume();if(saves.forms.edit){const i=ideaById(saves.forms.edit.id);if(i)openEdit(i);}else if(saves.forms.capture)openCapture();else EvolutionUI.restoreDraft();}).catch(e=>{console.error(e);$('#reviewView').innerHTML=`<div class="empty"><h2>Could not load the ledger.</h2><p>${esc(e.message)}</p><p>Make sure you started it with <code>node server.js</code>, not by opening index.html directly.</p></div>`;toast(e.message,true);});
+loadLedger().then(()=>{if(!state.ledger)return;saves.resume();if(saves.forms.edit){const i=ideaById(saves.forms.edit.id);if(i)openEdit(i);}else if(saves.forms.capture)openCapture();else if(saves.forms.source)UsabilityUI.editSource(saves.forms.source.id);else EvolutionUI.restoreDraft();UsabilityUI.openLink();}).catch(e=>{console.error(e);$('#reviewView').innerHTML=`<div class="empty"><h2>Could not load the ledger.</h2><p>${esc(e.message)}</p><p>Make sure you started it with <code>node server.js</code>, not by opening index.html directly.</p></div>`;toast(e.message,true);});
 

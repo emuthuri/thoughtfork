@@ -45,6 +45,7 @@ async function createApplication(options = {}) {
       const url = new URL(req.url, `http://${req.headers.host}`);
       if (url.pathname.startsWith('/api/')) {
         const match = url.pathname.match(/^\/api\/ideas\/([^/]+)$/);
+        const sourceMatch=url.pathname.match(/^\/api\/sources\/([^/]+)$/);
         const evolutionMatch=url.pathname.match(/^\/api\/ideas\/([^/]+)\/(provenance|supersede)$/);
         if (req.method === 'GET') {
           if (url.pathname === '/api/health') return json(res, 200, { application:'thoughtFork', launchProtocol:1, projectId:createHash('sha256').update(path.resolve(root).replaceAll('\\','/').toLowerCase()).digest('hex'), pid:process.pid, mode:store.inspect().mode });
@@ -53,8 +54,10 @@ async function createApplication(options = {}) {
           if (url.pathname === '/api/backup') return json(res, 200, { ledger: store.readBackup(url.searchParams.get('file')) });
           throw new LedgerError(405, 'METHOD_NOT_ALLOWED', 'This API route does not support GET.');
         }
-        if (!((match && req.method === 'PATCH') || (evolutionMatch && req.method === 'POST') || (!match && req.method === 'POST' && ['/api/ideas','/api/merge','/api/projects/rename','/api/projects/manage','/api/captures','/api/snapshot','/api/import/preview','/api/import','/api/recover'].includes(url.pathname)))) throw new LedgerError(405, 'METHOD_NOT_ALLOWED', 'Unsupported API route or HTTP method.');
+        if (!((sourceMatch && req.method==='PATCH') || (match && req.method === 'PATCH') || (evolutionMatch && req.method === 'POST') || (!match && req.method === 'POST' && ['/api/organise','/api/ideas','/api/merge','/api/projects/rename','/api/projects/manage','/api/captures','/api/snapshot','/api/import/preview','/api/import','/api/recover'].includes(url.pathname)))) throw new LedgerError(405, 'METHOD_NOT_ALLOWED', 'Unsupported API route or HTTP method.');
         const body = await readBody(req, ['/api/import/preview','/api/import','/api/recover'].includes(url.pathname) ? importLimit : 32 * 1024 * 1024);
+        if(sourceMatch)return json(res,200,await store.editSource(decodeURIComponent(sourceMatch[1]),body));
+        if(url.pathname==='/api/organise')return json(res,200,await store.organise(body));
         if (match) return json(res, 200, await store.patch(decodeURIComponent(match[1]), body));
         if(evolutionMatch)return json(res,200,await store[evolutionMatch[2]==='provenance'?'attachSource':'supersede'](decodeURIComponent(evolutionMatch[1]),body));
         if(url.pathname==='/api/ideas')return json(res,201,await store.createIdea(body));

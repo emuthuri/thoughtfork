@@ -5,7 +5,7 @@ const NavigationUI=(()=>{
   const narrow=()=>matchMedia('(max-width:760px)').matches;
   function storageRead(name){try{return JSON.parse(localStorage.getItem(name)||'null');}catch(_){return null;}}
   function write(){if(!key)return;try{localStorage.setItem(key,JSON.stringify({prefs,position:position()}));}catch(_){$('#navigationNotice').textContent='Navigation preferences could not be stored in this browser. Research saves and drafts have their own status above.';}}
-  function position(){return {...Object.fromEntries(['view','project','disposition','action','search','reviewId','sort','pages','searchKind','compileProject','threadId'].map(k=>[k,state[k]])),scroll:Math.max(0,scrollY),generation:saves?.generation};}
+  function position(){return {...Object.fromEntries(['view','project','disposition','action','search','reviewId','sort','pages','searchKind','compileProject','threadId','sourceSort','tagFilter','searchScope','viewSorts'].map(k=>[k,state[k]])),scroll:Math.max(0,scrollY),generation:saves?.generation};}
   function loaded(){
     const next='research-ledger-navigation:'+saves.key.split(':')[1];
     if(next!==key){key=next;restored=false;prefs=defaults();stack=[];}
@@ -17,8 +17,9 @@ const NavigationUI=(()=>{
         for(const field of ['project','search','reviewId','compileProject','threadId'])if(typeof p[field]==='string')state[field]=p[field];
         if(DISPOSITIONS.includes(p.disposition)||p.disposition==='All')state.disposition=p.disposition;
         if(ACTIONS.includes(p.action)||p.action==='All')state.action=p.action;
-        if(['original','title','updated','reviewed','created'].includes(p.sort))state.sort=p.sort;
+        if(['original','title','updated','reviewed','created','created-oldest','updated-oldest','title-desc'].includes(p.sort))state.sort=p.sort;
         if(['all','ideas','sources'].includes(p.searchKind))state.searchKind=p.searchKind;
+        for(const f of ['sourceSort','tagFilter','searchScope'])if(typeof p[f]==='string')state[f]=p[f];if(p.viewSorts&&typeof p.viewSorts==='object')state.viewSorts=p.viewSorts;
         if(p.pages&&typeof p.pages==='object')for(const field of ['browse','sources','search'])if(Number.isInteger(p.pages[field])&&p.pages[field]>=0)state.pages[field]=p.pages[field];
       }restored=true;$('#searchInput').value=state.search;}
     const names=new Set(Retrieval.projects(state.ledger).map(p=>p.name));if(state.project!=='All'&&!names.has(Retrieval.projectName(state.project)))state.project='All';
@@ -54,7 +55,7 @@ const NavigationUI=(()=>{
     const text=[state.project!=='All'?'Project: '+Retrieval.projectName(state.project):'',state.disposition!=='All'?EvolutionUI.dispositionLabel(state.disposition):'',state.action!=='All'?'Action: '+state.action:'',state.search?'Search: '+state.search:''].filter(Boolean).join(' · ');
     $('#navigationContext').innerHTML=`${stack.length?'<button id="navigationBack" type="button" class="button">← Back to previous context</button>':''}<span id="activeFilterSummary">${esc(text||'All ideas · no filters')}</span>${text?'<button id="clearFilters" type="button" class="link-button">Clear filters</button>':''}<label class="sort-control ${['sources','compile','thread'].includes(state.view)?'hidden':''}">Idea order <select id="ideaSort" aria-label="Idea order">${[['original','Original order / search relevance'],['updated','Recently edited'],['reviewed','Recently reviewed'],['created','Recently created'],['title','Title A–Z']].map(([value,label])=>`<option value="${value}" ${state.sort===value?'selected':''}>${label}</option>`).join('')}</select></label>`;
     $('#navigationBack')?.addEventListener('click',back);$('#clearFilters')?.addEventListener('click',()=>{state.project=state.disposition=state.action='All';clearSearch();resetPages();ensureCurrentVisible();renderAll();});
-    $('#ideaSort').onchange=e=>{state.sort=e.target.value;resetPages();ensureCurrentVisible();renderAll();$('#ideaSort').focus();};
+    $('#ideaSort').onchange=e=>{state.sort=e.target.value;state.viewSorts||={};state.viewSorts[state.view]=state.sort;resetPages();ensureCurrentVisible();renderAll();$('#ideaSort').focus();};
     shell();write();
   }
   async function openProjects(){

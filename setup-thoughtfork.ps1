@@ -28,6 +28,7 @@ try {
         $link.IconLocation = (Join-Path $PSScriptRoot 'public\icons\thoughtfork.ico') + ',0'
         $link.WindowStyle = 7
         $link.Save()
+        Set-ThoughtForkShortcutIdentity -File $file -ProjectRoot $PSScriptRoot
     }
     if ($RemoveShortcuts) { Write-Output 'Removed thoughtFork-owned shortcuts only. Application and research files are unchanged.' } else { Write-Output 'thoughtFork shortcuts are ready. No research files were changed.' }
 } catch { if ($ShowDialog) { Show-ThoughtForkError $_.Exception.Message } else { [Console]::Error.WriteLine($_.Exception.Message) }; exit 1 }

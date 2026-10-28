@@ -3,13 +3,16 @@
   "version": "2.0.0",
   "private": true,
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/emuthuri/thoughtfork.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/emuthuri/thoughtfork.git"
+  },
   "description": "Follow what became of an idea. A local-first research notebook.",
   "scripts": {
     "start": "node server.js",
     "open": "node server.js --open",
-    "test": "node --test tests/persistence.test.js tests/client.test.js tests/evolution.test.js tests/retrieval.test.js tests/appearance.test.js tests/thread.test.js tests/desktop.test.js",
-    "test:browser": "node --test tests/browser.test.js tests/evolution-browser.test.js tests/retrieval-browser.test.js tests/appearance-browser.test.js tests/thread-browser.test.js",
+    "test": "node --test tests/persistence.test.js tests/client.test.js tests/evolution.test.js tests/retrieval.test.js tests/appearance.test.js tests/thread.test.js tests/desktop.test.js tests/usability.test.js tests/recovery.test.js",
+    "test:browser": "node --test tests/browser.test.js tests/evolution-browser.test.js tests/retrieval-browser.test.js tests/appearance-browser.test.js tests/thread-browser.test.js tests/usability-browser.test.js tests/recovery-browser.test.js",
     "test:desktop": "node --test tests/windows-launcher.test.js tests/desktop-browser.test.js",
     "icons:build": "node tools/build-icons.cjs"
   },

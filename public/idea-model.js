@@ -6,7 +6,7 @@
     if(!refs.some(p=>p.sourceId===idea.source))refs.unshift({sourceId:idea.source});
     return refs;
   }
-  function unionOrigins(ideas){const refs=new Map();for(const i of ideas)for(const p of origins(i))refs.set(JSON.stringify([p.sourceId,p.start??null,p.end??null]),p);return [...refs.values()];}
+  function unionOrigins(ideas){const refs=new Map();for(const i of ideas)for(const p of origins(i))refs.set(JSON.stringify([p.sourceId,p.sourceRevision||0,p.start??null,p.end??null]),p);return [...refs.values()];}
   function connections(ideas){
     const edges=[];
     for(const i of ideas){
@@ -33,7 +33,8 @@
     return warnings;
   }
   function relationText(relation,ideas){const target=ideas.find(i=>i.id===relation.targetId);return `${relation.relation} “${target?.title||'Missing idea'}” (${relation.targetId})${relation.note?` — ${relation.note}`:''}`;}
-  function sourceText(ref,sources){const source=sources.find(s=>s.id===ref.sourceId);return `${source?.title||'Missing source'} (${ref.sourceId})${ref.start!==undefined?` · excerpt: ${source?.raw.slice(ref.start,ref.end)||''}`:''}`;}
+  function sourceRaw(ref,source){const n=ref.sourceRevision||0;return source?.revisions?.[n]?.raw??source?.raw??'';}
+  function sourceText(ref,sources){const source=sources.find(s=>s.id===ref.sourceId);return `${source?.title||'Missing source'} (${ref.sourceId}${source?.revisions?.length?' · source revision '+(ref.sourceRevision||0):''})${ref.start!==undefined?` · excerpt: ${sourceRaw(ref,source).slice(ref.start,ref.end)||''}`:''}`;}
   function markdown(ledger,project='All',generated=new Date().toLocaleString(),exactProject=false){
     const selected=ledger.ideas.filter(i=>i.review.include&&((project==='All'&&!exactProject)||i.project===project)),groups=new Map();
     for(const idea of selected){if(!groups.has(idea.project))groups.set(idea.project,[]);groups.get(idea.project).push(idea);}
@@ -59,6 +60,6 @@
     for(let n=0;n<ready.length;n++){const id=ready[n];count++;for(const to of next.get(id)||[]){degree.set(to,degree.get(to)-1);if(degree.get(to)===0)ready.push(to);}}
     if(count!==ideas.length)throw new Error('Supersession/merge would create a replacement cycle. No changes were saved.');
   }
-  const api={origins,unionOrigins,connections,replacements,successors,currentInheritors,disposition,compilationWarnings,relationText,sourceText,markdown,assertAcyclic};
+  const api={sourceRaw,origins,unionOrigins,connections,replacements,successors,currentInheritors,disposition,compilationWarnings,relationText,sourceText,markdown,assertAcyclic};
   if(typeof module==='object'&&module.exports)module.exports=api;else root.IdeaModel=api;
 })(typeof window==='undefined'?globalThis:window);

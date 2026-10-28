@@ -11,9 +11,9 @@
     }
     connect(envelope) {
       this.ledger=envelope.ledger;this.versions=envelope.ideaVersions;this.version=envelope.version;
-      this.generation=envelope.generation;this.revision=envelope.revision;this.backup=envelope.backup;this.acceptedRevisions=Object.fromEntries(this.ledger.ideas.map(i=>[i.id,this.revision]));
+      this.sourceVersions=envelope.sourceVersions||{};this.generation=envelope.generation;this.revision=envelope.revision;this.backup=envelope.backup;this.acceptedSourceRevisions=Object.fromEntries(this.ledger.sources.map(s=>[s.id,this.revision]));this.acceptedRevisions=Object.fromEntries(this.ledger.ideas.map(i=>[i.id,this.revision]));
       const key=`research-ledger-drafts:${envelope.ledgerId}:${this.tab}`;
-      if(this.key!==key){this.key=key;try { const saved=JSON.parse(this.storage.getItem(key)||'{}');this.drafts=Object.assign(Object.create(null),saved.drafts||{});this.forms=saved.forms||{};for(const f of Object.values(this.forms))if(f.status==='saving'){f.status='unsaved';f.error='The previous save was interrupted. Inspect confirmed state before retrying.';}for(const d of Object.values(this.drafts))if(d.status==='saving')d.status='unsaved'; }catch(_){this.storageWarning='Stored drafts could not be read. Keep this tab open and copy unsaved text before closing.';}}
+      if(this.key!==key){this.key=key;this.unrecognizedSession=false;try { const saved=JSON.parse(this.storage.getItem(key)||'{}');if(!this.sessionValue(saved)?.known){this.unrecognizedSession=true;this.storageWarning='This session contains unrecognized retained content and was left untouched.';return;}this.drafts=Object.assign(Object.create(null),saved.drafts||{});this.forms=saved.forms||{};this.metadata=saved.metadata||null;for(const f of Object.values(this.forms))if(f.status==='saving'){f.status='unsaved';f.error='The previous save was interrupted. Inspect confirmed state before retrying.';}for(const d of Object.values(this.drafts))if(d.status==='saving')d.status='unsaved'; }catch(_){this.unrecognizedSession=true;this.storageWarning='Stored drafts could not be read. Keep this tab open and copy unsaved text before closing.';}}
       // A response can be lost during navigation even though its exact intent reached disk.
       // GET is authoritative: only reconcile identical values in the same corpus generation.
       for(const [id,d] of Object.entries(this.drafts)){
@@ -25,11 +25,47 @@
     notify(){this.onChange(this);}
     persist(){
       if(!this.key)return;
-      try{this.storage.setItem(this.key,JSON.stringify({drafts:this.drafts,forms:this.forms}));}
+      try{if(!this.dirty()&&this.storage.removeItem)this.storage.removeItem(this.key);else this.storage.setItem(this.key,JSON.stringify({drafts:this.drafts,forms:this.forms,...(this.metadata?{metadata:this.metadata}:{})}));}
       catch(_){this.storageWarning='Browser draft storage is full or unavailable. Unsaved text is only in this tab; copy it before closing.';}
       this.notify();
     }
-    setForm(name,value){if(value===null)delete this.forms[name];else this.forms[name]=copy(value);this.persist();}
+    touch(){this.metadata={lastUpdated:new Date().toISOString(),types:[...new Set([...Object.keys(this.forms),...Object.values(this.drafts).map(d=>Object.keys(d.patch||{}).length===1&&'comment'in d.patch?'comment':'idea')])],titles:[...Object.values(this.forms).flatMap(f=>(f?.cards||f?.captureCards||[f]).map(v=>v?.title||v?.patch?.title||this.ledger?.ideas.find(i=>i.id===v?.id)?.title||this.ledger?.sources.find(i=>i.id===v?.id)?.title||v?.raw?.trim().split(/\r?\n/)[0])),...Object.keys(this.drafts).map(id=>this.ledger?.ideas.find(i=>i.id===id)?.title)].filter(t=>typeof t==='string'&&t.trim()).slice(0,20)};}
+    sessionPrefix(){return this.key?.split(':').slice(0,2).join(':')+':';}
+    sessionValue(value){
+      const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+      if(!object(value)||!['drafts','forms'].every(k=>value[k]===undefined||object(value[k])))return null;
+      const extras=Object.keys(value).filter(k=>!['drafts','forms','metadata'].includes(k));
+      const metadataSafe=value.metadata===undefined||object(value.metadata)&&Object.keys(value.metadata).every(k=>['lastUpdated','types','titles'].includes(k));
+      return {empty:!Object.keys(value.drafts||{}).length&&!Object.keys(value.forms||{}).length&&!extras.length&&metadataSafe,known:!extras.length&&metadataSafe};
+    }
+    discardSession(key,expected){
+      if(key===this.key||!key?.startsWith(this.sessionPrefix())||typeof expected!=='string')return false;
+      try{const raw=this.storage.getItem(key);if(raw!==expected)return false;this.storage.removeItem(key);return this.storage.getItem(key)===null;}catch(_){this.storageWarning='The retained session could not be discarded. Its storage may be unavailable.';return false;}
+    }
+    setForm(name,value){if(value===null)delete this.forms[name];else this.forms[name]=copy(value);this.touch();this.persist();}
+    recoverable(){
+      const found=[];if(!this.key)return found;
+      try{const keys=Array.from({length:this.storage.length||0},(_,n)=>this.storage.key(n));
+        for(const key of keys){if(key===this.key||!key?.startsWith(this.sessionPrefix()))continue;
+          try{const raw=this.storage.getItem(key);if(raw===null)continue;const value=JSON.parse(raw),shape=this.sessionValue(value);
+            if(!shape){this.storageWarning='Some retained sessions could not be interpreted and were left untouched.';continue;}
+            if(shape.empty){if(this.storage.getItem(key)===raw&&this.storage.removeItem)this.storage.removeItem(key);continue;}
+            found.push({...value,key,raw,known:shape.known});
+          }catch(_){this.storageWarning='Some retained sessions could not be read and were left untouched.';}
+        }
+      }catch(_){this.storageWarning='Other-window drafts could not be read.';}
+      return found;
+    }
+    recover(key,expected){
+      if(this.dirty())return false;const item=this.recoverable().find(v=>v.key===key);if(!item||!item.known||expected!==undefined&&item.raw!==expected)return false;
+      this.drafts=copy(item.drafts||{});this.forms=copy(item.forms||{});this.metadata=copy(item.metadata||null);
+      for(const v of [...Object.values(this.drafts),...Object.values(this.forms)])if(v.status==='saving'){v.status='unsaved';v.error='Interrupted save. Inspect confirmed state before retrying.';}
+      this.persist();
+      try{const stored=JSON.parse(this.storage.getItem(this.key)||'{}');if(JSON.stringify(stored.drafts)!==JSON.stringify(this.drafts)||JSON.stringify(stored.forms)!==JSON.stringify(this.forms))return false;
+        if(this.storage.getItem(key)===item.raw){if(this.storage.removeItem)this.storage.removeItem(key);else this.storage.setItem(key,JSON.stringify({drafts:{},forms:{}}));}
+      }catch(_){this.storageWarning='Recovered drafts remain in both windows because storage could not be verified.';return false;}
+      return true;
+    }
     dirty(){return Object.keys(this.drafts).length>0||Object.keys(this.forms).length>0;}
     status(){const statuses=[...Object.values(this.drafts),...Object.values(this.forms)].map(d=>d.status);return statuses.includes('conflict')?'Conflict':statuses.includes('failed')?'Save failed':this.runners.size||statuses.includes('saving')?'Saving…':this.dirty()?'Unsaved':'Saved';}
     draft(id){return this.drafts[id]||null;}
@@ -39,12 +75,12 @@
       else if(baseVersion!==undefined)d.baseVersion=baseVersion;
       Object.assign(d.patch,copy(patch));d.seq++;
       if(!['failed','conflict'].includes(d.status)||retry){d.status='unsaved';d.error=null;}
-      this.persist();clearTimeout(this.timers.get(id));this.timers.delete(id);
+      this.touch();this.persist();clearTimeout(this.timers.get(id));this.timers.delete(id);
       if(delay>0)this.timers.set(id,setTimeout(()=>{this.timers.delete(id);this.flush(id).catch(()=>{});},delay));
       return d;
     }
     accept(out){
-      const ideas=out.ideas||[out.idea];this.acceptedRevisions||={};
+      const ideas=out.ideas||(out.idea?[out.idea]:[]);this.acceptedRevisions||={};
       for(const idea of ideas){
         if(out.revision<(this.acceptedRevisions[idea.id]??-1))continue;
         const index=this.ledger.ideas.findIndex(i=>i.id===idea.id);
@@ -52,7 +88,7 @@
         this.versions[idea.id]=out.ideaVersions?.[idea.id]||(idea.id===out.idea?.id?out.ideaVersion:this.versions[idea.id]);
         this.acceptedRevisions[idea.id]=out.revision;
       }
-      if(out.source&&!this.ledger.sources.some(s=>s.id===out.source.id))this.ledger.sources.push(out.source);
+      {for(const source of out.sources||(out.source?[out.source]:[])){this.acceptedSourceRevisions||={};if(out.revision<(this.acceptedSourceRevisions[source.id]??-1))continue;this.acceptedSourceRevisions[source.id]=out.revision;const at=this.ledger.sources.findIndex(s=>s.id===source.id);if(at<0)this.ledger.sources.push(source);else this.ledger.sources[at]=source;this.sourceVersions||={};this.sourceVersions[source.id]=out.sourceVersions?.[source.id]||(source.id===out.source?.id?out.sourceVersion:this.sourceVersions[source.id]);}}
       if(out.revision>=this.revision){this.revision=out.revision;this.version=out.version;this.generation=out.generation;this.ledger.meta=out.meta;this.backup=out.backup;}
       this.onConfirmed(this);
     }
@@ -65,8 +101,10 @@
         while(this.drafts[id]){
           const current=this.drafts[id],snapshot=copy(current);current.status='saving';this.persist();
           try{
+            const previous=this.ledger.ideas.find(i=>i.id===id),before=previous?copy(previous):null;
             const out=await this.request(`/api/ideas/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({patch:snapshot.patch,baseVersion:snapshot.baseVersion})});
             this.accept(out);
+            if(before&&(!out.ideas||out.ideas.length===1))this.lastUndo={id,baseVersion:out.ideaVersion,patch:Object.fromEntries(Object.keys(snapshot.patch).map(k=>[k,copy(k in before.review?before.review[k]:before[k])]))};
             if(this.drafts[id]?.seq===snapshot.seq)delete this.drafts[id];
             else if(this.drafts[id]){this.drafts[id].baseVersion=out.ideaVersion;this.drafts[id].status='unsaved';}
             this.persist();
