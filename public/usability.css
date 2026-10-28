@@ -8,3 +8,6 @@
 .source-preview-text{font-size:var(--source-reader-size,16px);line-height:1.6}
 
 #captureForm .modal-actions{position:sticky;bottom:0;background:var(--panel);padding:12px 0;border-top:1px solid var(--border-2);z-index:2}
+.recovery-card{margin:14px 0;padding:16px;background:var(--panel);border:1px solid var(--border-2);border-radius:8px;min-width:0;overflow-wrap:anywhere}.recovery-card h2{font-size:18px}.recovery-card h3{font-size:15px;margin:12px 0 4px}.recovery-card ul{padding-left:20px}.recovery-card li{margin:10px 0}.recovery-preview{white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:4px 0;line-height:1.6}.recovery-full[open] .recovery-preview{display:block;overflow:visible}.recovery-full pre{white-space:pre-wrap;overflow-wrap:anywhere}.recovery-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}.recovery-count{font-weight:600}.recovery-card strong{overflow-wrap:anywhere}#draftRecoveryDialog{width:min(760px,calc(100vw - 24px));box-sizing:border-box}.recovery-full summary{cursor:pointer}
+
+#draftRecoveryDialog{padding:16px}
